@@ -58,7 +58,7 @@ typedef struct RenderThreadData {
 	sf::Font *font;
 } RenderThreadData;
 
-void HandleKbdEventsWindow(sf::Window &window, float deltaTime, bool inFocus) {
+void HandleKbdEvents(sf::Window &window, float deltaTime, bool inFocus) {
 	if(!inFocus)
 		return;	
 	
@@ -199,8 +199,11 @@ int main(int argc, char** argv) {
 
 		// Handle Keyboard input
 		// TODO: Make this multi-threaded
-		HandleKbdEventsWindow(window, elapsedTime, inFocus);	
+		HandleKbdEvents(window, elapsedTime, inFocus);	
 	}
+
+	// Wait for renderer to finish
+	thread.wait();
 
 	return EXIT_SUCCESS;
 }
