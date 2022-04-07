@@ -58,7 +58,10 @@ typedef struct RenderThreadData {
 	sf::Font *font;
 } RenderThreadData;
 
-void HandleKbdEventsWindow(sf::Window &window, float deltaTime) {
+void HandleKbdEventsWindow(sf::Window &window, float deltaTime, bool inFocus) {
+	if(!inFocus)
+		return;	
+	
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
 		window.close();
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
@@ -141,6 +144,8 @@ void Render(RenderThreadData *threadData) {
 int main(int argc, char** argv) {
 	UNUSED_PARAMETER(argc);
 
+	bool inFocus = true;
+
 	// Alert X that this will be a multithreaded application
 	XInitThreads();
 
@@ -151,9 +156,11 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;	
 	}
 
+	sf::ContextSettings contextSettings(0, 0, 8);
+
 	// Create window, circle, and text objects
-	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0], sf::Style::Titlebar | sf::Style::Close);
-	//window.setFramerateLimit(256);
+	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0], sf::Style::Titlebar | sf::Style::Close, contextSettings);
+	window.setFramerateLimit(250);
 	window.setActive(false); // Disable OpenGl context before passing context to thread
 
 	// Create data that will be passed to rendering thread
@@ -177,6 +184,12 @@ int main(int argc, char** argv) {
 					break;
 				case sf::Event::Resized: // TODO: Add screen resize handler
 					break;
+				case sf::Event::GainedFocus:
+					inFocus = true;
+					break;
+				case sf::Event::LostFocus:
+					inFocus = false;
+					break;
 				default:
 					break;
 			}
@@ -186,7 +199,7 @@ int main(int argc, char** argv) {
 
 		// Handle Keyboard input
 		// TODO: Make this multi-threaded
-		HandleKbdEventsWindow(window, elapsedTime);	
+		HandleKbdEventsWindow(window, elapsedTime, inFocus);	
 	}
 
 	return EXIT_SUCCESS;
