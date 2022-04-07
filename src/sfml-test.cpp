@@ -44,11 +44,11 @@
 #endif
 
 #define FONT_DIR "fonts"
-#define FONTSIZE 15
+#define FONTSIZE 13
 #define CIRCLESIZE 10.0f
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
-#define MOVEMENTSPEED 80.0f
+#define MOVEMENTSPEED 160.0f
 
 std::mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
@@ -62,8 +62,11 @@ void HandleKbdEvents(sf::Window &window, float deltaTime, bool inFocus) {
 	if(!inFocus)
 		return;	
 	
+	// Close window on escape keypress
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
 		window.close();
+	
+	// Handle ball control
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
 		p_shapeMutex.lock();
 		p_shape->setPosition(p_shape->getPosition().x, p_shape->getPosition().y-(MOVEMENTSPEED*deltaTime));
@@ -128,7 +131,7 @@ void Render(RenderThreadData *threadData) {
 	while(window->isOpen()) {
 		auto elapsedTime = clock.restart().asSeconds();
 		auto fps = 1.0f/elapsedTime; // Calculate FPS
-		text.setString(std::to_string(fps)); // Convert FPS to string
+		text.setString("Renderer FPS: " + std::to_string(fps)); // Convert FPS to string
 
 		window->clear(); // Clear screen
 		
@@ -156,6 +159,7 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;	
 	}
 
+	// Create default context settings with an antialiasing level of 8
 	sf::ContextSettings contextSettings(0, 0, 8);
 
 	// Create window, circle, and text objects

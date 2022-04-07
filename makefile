@@ -4,7 +4,7 @@
 
 CC = g++
 CFLAGS = -DDEBUG -std=gnu++2a -Wall -Wextra -c -O2 -pedantic -o
-LIBS = `pkg-config --libs sfml-all` -lX11
+LIBS = `pkg-config --libs sfml-all` `pkg-config --libs x11`
 
 SRCDIR = src
 OBJDIR = bin-int
@@ -26,4 +26,4 @@ clean:
 	rm -rf ${OBJDIR} ${BINDIR}
 
 ${SFML-TEST-OBJ}: ${SFML-TEST-CPP}
-	${CC} ${SFML-TEST-CPP} ${CFLAGS} `pkg-config --cflags sfml-all` ${SFML-TEST-OBJ}
+	${CC} ${SFML-TEST-CPP} ${CFLAGS} `pkg-config --cflags sfml-all` `pkg-config --cflags x11` ${SFML-TEST-OBJ}
