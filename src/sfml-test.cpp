@@ -45,6 +45,10 @@
 #define UNUSED_PARAMETER(x) (void)(x)
 #endif
 
+#ifndef BASE_DIR
+#define BASE_DIR "./"
+#endif
+
 #define FONT_DIR "fonts"
 #define FONTSIZE 13
 #define CIRCLESIZE 10.0f
@@ -180,7 +184,7 @@ int main(int argc, char** argv) {
 
 	// Load font for text
 	sf::Font font;
-	if(!font.loadFromFile(FONT_DIR "/Ubuntu-Regular.ttf")) {
+	if(!font.loadFromFile(BASE_DIR FONT_DIR "/Ubuntu-Regular.ttf")) {
 		std::cerr << "Failed to load fonts" << std::endl;
 		return EXIT_FAILURE;	
 	}

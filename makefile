@@ -3,7 +3,7 @@
 #
 
 CC = g++
-CFLAGS = -DDEBUG -std=gnu++2a -Wall -Wextra -c -O2 -pedantic -o
+CFLAGS = -DDEBUG -std=gnu++2a -Wall -Wextra -c -O2 -pedantic -DBASE_DIR=\"`pwd`/\" -o
 LIBS = `pkg-config --libs sfml-all` `pkg-config --libs x11`
 
 SRCDIR = src
