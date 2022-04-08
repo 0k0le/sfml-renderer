@@ -21,9 +21,11 @@
  */
 
 // Standard Library
+#include <SFML/System/Vector2.hpp>
 #include <iostream>
 #include <ctime>
 #include <mutex>
+#include <algorithm>
 
 // SFML Includes
 #include <SFML/Graphics.hpp>
@@ -46,9 +48,9 @@
 #define FONT_DIR "fonts"
 #define FONTSIZE 13
 #define CIRCLESIZE 10.0f
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
-#define MOVEMENTSPEED 160.0f
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 768
+#define MOVEMENTSPEED 400.0f
 
 std::mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
@@ -58,7 +60,21 @@ typedef struct RenderThreadData {
 	sf::Font *font;
 } RenderThreadData;
 
-void HandleKbdEvents(sf::Window &window, float deltaTime, bool inFocus) {
+void MoveCharacter(sf::CircleShape &character, float xOffset, float yOffset, sf::RenderWindow &window) {
+	auto radius = character.getRadius();
+	auto vec = character.getPosition();
+	vec.x += xOffset;
+	vec.y += yOffset;
+
+	// Make sure the ball can never leave the screen
+	vec.x = std::clamp<float>(vec.x, 0.0f, window.getSize().x-radius*2);
+	vec.y = std::clamp<float>(vec.y, 0.0f, window.getSize().y-radius*2);	
+
+	character.setPosition(vec);
+}
+
+void HandleKbdEvents(sf::RenderWindow &window, float deltaTime, bool inFocus) {
+	// If the window is not in focus exit...
 	if(!inFocus)
 		return;	
 	
@@ -69,22 +85,22 @@ void HandleKbdEvents(sf::Window &window, float deltaTime, bool inFocus) {
 	// Handle ball control
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
 		p_shapeMutex.lock();
-		p_shape->setPosition(p_shape->getPosition().x, p_shape->getPosition().y-(MOVEMENTSPEED*deltaTime));
+		MoveCharacter(*p_shape, 0.0f, .0f-(MOVEMENTSPEED*deltaTime), window);
 		p_shapeMutex.unlock();
 	}
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
 		p_shapeMutex.lock();
-		p_shape->setPosition(p_shape->getPosition().x, p_shape->getPosition().y+(MOVEMENTSPEED*deltaTime));
+		MoveCharacter(*p_shape, 0.0f, (MOVEMENTSPEED*deltaTime), window);
 		p_shapeMutex.unlock();
 	}
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 		p_shapeMutex.lock();
-		p_shape->setPosition(p_shape->getPosition().x-(MOVEMENTSPEED*deltaTime), p_shape->getPosition().y);
+		MoveCharacter(*p_shape, .0f-(MOVEMENTSPEED*deltaTime), 0.0f, window);
 		p_shapeMutex.unlock();
 	}
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
 		p_shapeMutex.lock();
-		p_shape->setPosition(p_shape->getPosition().x+(MOVEMENTSPEED*deltaTime), p_shape->getPosition().y);
+		MoveCharacter(*p_shape, (MOVEMENTSPEED*deltaTime), 0.0f, window);
 		p_shapeMutex.unlock();
 	}
 }
@@ -144,6 +160,16 @@ void Render(RenderThreadData *threadData) {
 	}
 }
 
+void SetDefaultWindowPosition(sf::RenderWindow &window) {
+	auto desktop = sf::VideoMode::getDesktopMode();
+	auto windowDimensions = window.getSize();
+
+	sf::Vector2i windowPosition = {static_cast<int>(desktop.width/2 - windowDimensions.x/2),
+			static_cast<int>(desktop.height/2 - windowDimensions.y/2)};
+
+	window.setPosition(windowPosition);
+}
+
 int main(int argc, char** argv) {
 	UNUSED_PARAMETER(argc);
 
@@ -163,8 +189,11 @@ int main(int argc, char** argv) {
 	sf::ContextSettings contextSettings(0, 0, 8);
 
 	// Create window, circle, and text objects
-	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0], sf::Style::Titlebar | sf::Style::Close, contextSettings);
+	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0],
+		   	sf::Style::Titlebar | sf::Style::Close, contextSettings); // Disable resize for now
+	
 	window.setFramerateLimit(250);
+	SetDefaultWindowPosition(window);
 	window.setActive(false); // Disable OpenGl context before passing context to thread
 
 	// Create data that will be passed to rendering thread
