@@ -43,6 +43,8 @@
 #define DPRINT(str, ...)
 #endif
 
+#define EPRINT(str, ...) fprintf(stderr, "ERROR --> " str "\nSTERROR: %s\n", ##__VA_ARGS__, strerror(errno))
+
 #define FATAL(str, ...) { fprintf(stderr, "FATAL --> " str "\nSTRERROR: %s\n", ##__VA_ARGS__, strerror(errno)); exit(EXIT_FAILURE); } 
 
 #if defined(UNUSED_PARAMETER)
@@ -183,16 +185,22 @@ sf::Vector2i PrimaryMonitorCoordinates() {
 	auto mon = xcb_randr_get_output_primary(conn, screen->root);
 	auto reply = xcb_randr_get_output_primary_reply(conn, mon, nullptr);
 
-	if(reply == nullptr)
-		FATAL("Could not recieve RANDR outputs");
+	if(reply == nullptr) {
+		EPRINT("Could not recieve RANDR outputs");
+		return {0, 0};
+	}
 
 	// Get root output device
 	auto output = xcb_randr_get_output_info_reply(conn, xcb_randr_get_output_info(conn, reply->output, XCB_CURRENT_TIME), nullptr);
-	if(output == nullptr)
-		FATAL("Failed to get output handle!");
+	if(output == nullptr) {
+		EPRINT("Failed to get output handle!");
+		return {0, 0};
+	}
 
-	if(output->crtc == XCB_NONE || output->connection == XCB_RANDR_CONNECTION_DISCONNECTED)
-		FATAL("What the fuck?");
+	if(output->crtc == XCB_NONE || output->connection == XCB_RANDR_CONNECTION_DISCONNECTED) {
+		EPRINT("Display detected as disconnected or missing");
+		return {0, 0};
+	}
 
 	// get root info
 	auto crtc = xcb_randr_get_crtc_info_reply(conn, xcb_randr_get_crtc_info(conn, output->crtc, XCB_CURRENT_TIME), nullptr);
