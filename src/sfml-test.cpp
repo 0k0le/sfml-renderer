@@ -26,18 +26,23 @@
 #include <ctime>
 #include <mutex>
 #include <algorithm>
+#include <sys/queue.h>
 
 // SFML Includes
 #include <SFML/Graphics.hpp>
 
 // X Includes
 #include <X11/Xlib.h>
+#include <xcb/xcb.h>
+#include <xcb/randr.h>
 
 #ifdef DEBUG
 #define DPRINT(str, ...) printf("DEBUG --> " str "\n", ##__VA_ARGS__)
 #else
 #define DPRINT(str, ...)
 #endif
+
+#define FATAL(str, ...) { fprintf(stderr, "FATAL --> " str "\n", ##__VA_ARGS__); exit(EXIT_FAILURE); } 
 
 #if defined(UNUSED_PARAMETER)
 #error UNUSED_PARAMETER has already been defined!
@@ -58,6 +63,21 @@
 
 std::mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
+
+typedef struct Rect {
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+} Rect;
+
+/** Defines an output as detected by RandR. */
+typedef struct Output {
+    xcb_randr_output_t id;
+    Rect rect;
+
+    TAILQ_ENTRY(Output) outputs;
+} Output;
 
 typedef struct RenderThreadData {
 	sf::RenderWindow *window;
@@ -131,8 +151,8 @@ void Render(RenderThreadData *threadData) {
 	sf::Text text(std::string(""), *font, FONTSIZE);
 	
 	// Set shape to center of screen/set the color
-	auto shapeX = (window->getSize().x/2) - shape.getRadius();
-	auto shapeY = (window->getSize().y/2) - shape.getRadius();
+	auto shapeX = (static_cast<float>(window->getSize().x)/2) - shape.getRadius();
+	auto shapeY = (static_cast<float>(window->getSize().y)/2) - shape.getRadius();
 
 	shape.setFillColor(sf::Color::Green);
 	shape.setPosition(shapeX, shapeY);
@@ -164,12 +184,59 @@ void Render(RenderThreadData *threadData) {
 	}
 }
 
+sf::Vector2i PrimaryMonitorCoordinates() {
+	// Create xcb handle
+	auto conn = xcb_connect(nullptr, nullptr);
+
+	if(xcb_connection_has_error(conn))
+		FATAL("Failed to get XCB handle");
+
+	// Get root screen
+	const auto setup = xcb_get_setup(conn);
+	auto screen = xcb_setup_roots_iterator(setup).data;
+	auto mon = xcb_randr_get_output_primary(conn, screen->root);
+	auto reply = xcb_randr_get_output_primary_reply(conn, mon, nullptr);
+
+	if(reply == nullptr)
+		FATAL("Could not recieve RANDR outputs");
+
+	// Get root output device
+	auto output = xcb_randr_get_output_info_reply(conn, xcb_randr_get_output_info(conn, reply->output, XCB_CURRENT_TIME), nullptr);
+	if(output == nullptr)
+		FATAL("Failed to get output handle!");
+
+	if(output->crtc == XCB_NONE || output->connection == XCB_RANDR_CONNECTION_DISCONNECTED)
+		FATAL("What the fuck?");
+
+	// get root info
+	auto crtc = xcb_randr_get_crtc_info_reply(conn, xcb_randr_get_crtc_info(conn, output->crtc, XCB_CURRENT_TIME), nullptr);
+	if(crtc == nullptr)
+		FATAL("Couldn't get crtc");
+
+	sf::Vector2i ret = {crtc->x, crtc->y};
+
+	free(crtc);
+	free(output);
+	free(reply);
+
+	xcb_disconnect(conn);
+
+	return ret;
+}
+
 void SetDefaultWindowPosition(sf::RenderWindow &window) {
 	auto desktop = sf::VideoMode::getDesktopMode();
 	auto windowDimensions = window.getSize();
 
-	sf::Vector2i windowPosition = {static_cast<int>(desktop.width/2 - windowDimensions.x/2),
-			static_cast<int>(desktop.height/2 - windowDimensions.y/2)};
+	// xcb get monitor coordinates
+	auto primaryPosition = PrimaryMonitorCoordinates();
+
+	DPRINT("Desktop Width: %u\nDesktop Height: %u", desktop.width, desktop.height); 
+	DPRINT("Default Window Position: (%u, %u)", window.getPosition().x, window.getPosition().y);
+	DPRINT("Primary Monitor Position: (%u, %u)", primaryPosition.x, primaryPosition.y);
+
+	sf::Vector2i windowPosition = {primaryPosition.x + static_cast<int>(desktop.width/2 - windowDimensions.x/2),
+			primaryPosition.y + static_cast<int>(desktop.height/2 - windowDimensions.y/2)};
 
 	window.setPosition(windowPosition);
 }
