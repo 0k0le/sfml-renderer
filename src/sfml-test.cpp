@@ -26,6 +26,8 @@
 #include <ctime>
 #include <mutex>
 #include <algorithm>
+#include <errno.h>
+#include <cstring>
 
 // SFML Includes
 #include <SFML/Graphics.hpp>
@@ -41,7 +43,7 @@
 #define DPRINT(str, ...)
 #endif
 
-#define FATAL(str, ...) { fprintf(stderr, "FATAL --> " str "\n", ##__VA_ARGS__); exit(EXIT_FAILURE); } 
+#define FATAL(str, ...) { fprintf(stderr, "FATAL --> " str "\nSTRERROR: %s\n", ##__VA_ARGS__, strerror(errno)); exit(EXIT_FAILURE); } 
 
 #if defined(UNUSED_PARAMETER)
 #error UNUSED_PARAMETER has already been defined!
