@@ -26,7 +26,6 @@
 #include <ctime>
 #include <mutex>
 #include <algorithm>
-#include <sys/queue.h>
 
 // SFML Includes
 #include <SFML/Graphics.hpp>
@@ -63,21 +62,6 @@
 
 std::mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
-
-typedef struct Rect {
-    uint32_t x;
-    uint32_t y;
-    uint32_t width;
-    uint32_t height;
-} Rect;
-
-/** Defines an output as detected by RandR. */
-typedef struct Output {
-    xcb_randr_output_t id;
-    Rect rect;
-
-    TAILQ_ENTRY(Output) outputs;
-} Output;
 
 typedef struct RenderThreadData {
 	sf::RenderWindow *window;
