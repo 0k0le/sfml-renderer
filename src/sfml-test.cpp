@@ -71,6 +71,7 @@ sf::Mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
 bool onTheGround = false;
 bool jumpEvent = false;
+bool shutdown = false;
 
 typedef struct RenderThreadData {
 	sf::RenderWindow *window;
@@ -90,14 +91,15 @@ void MoveCharacter(sf::CircleShape &character, double xOffset, double yOffset, s
 	character.setPosition(vec);
 }
 
-void HandleKbdEvents(sf::RenderWindow &window, float deltaTime, bool inFocus) {
+bool HandleKbdEvents(sf::RenderWindow &window, float deltaTime, bool inFocus) {
 	// If the window is not in focus exit...
 	if(!inFocus)
-		return;	
+		return false;	
 	
 	// Close window on escape keypress
-	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
-		window.close();
+	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape)) {
+		return true;
+	}
 
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && onTheGround)
 		jumpEvent = true;
@@ -115,6 +117,8 @@ void HandleKbdEvents(sf::RenderWindow &window, float deltaTime, bool inFocus) {
 		MoveCharacter(*p_shape, (MOVEMENTSPEED*deltaTime), 0.0f, window);
 		p_shapeMutex.unlock();
 	}
+
+	return false;
 }
 
 /*
@@ -128,7 +132,6 @@ inline void WaitUntilActive(sf::RenderWindow &window) {
  * Handle all rendering related tasks
  */
 void Render(RenderThreadData *threadData) {
-	p_shapeMutex.lock();
 	sf::RenderWindow *window = threadData->window;
 	sf::Font *font = threadData->font;
 
@@ -153,6 +156,7 @@ void Render(RenderThreadData *threadData) {
 	sf::Clock clock;
 
 	// Get public handle on shape
+	p_shapeMutex.lock();
 	p_shape = &shape;
 	p_shapeMutex.unlock();
 
@@ -168,8 +172,18 @@ void Render(RenderThreadData *threadData) {
 			window->draw(text); // Draw text 
 			window->display(); // Push buffer to display
 		}
+
+		if(shutdown == true) {
+			window->close();
+			p_shapeMutex.unlock();
+			break;
+		}
 		p_shapeMutex.unlock();
 	}
+
+	p_shapeMutex.lock();
+	shutdown = false;
+	p_shapeMutex.unlock();
 
 	DPRINT("Thread exiting safetly");
 	return;
@@ -249,6 +263,15 @@ sf::Vector2i GetWindowOffset(sf::Vector2i &lastPos, sf::RenderWindow &window) {
 	return offset;
 }
 
+void WaitForRenderThread() {
+	while(true) {
+		p_shapeMutex.lock();
+		if(shutdown == false)
+			break;
+		p_shapeMutex.unlock();
+	}
+}
+
 int main(int argc, char** argv) {
 	UNUSED_PARAMETER(argc);
 
@@ -311,7 +334,11 @@ int main(int argc, char** argv) {
 		while(window.pollEvent(event)) {
 			switch(event.type) {
 				case sf::Event::Closed:
-					window.close();
+					p_shapeMutex.lock();
+					shutdown = true;
+					p_shapeMutex.unlock();
+					WaitForRenderThread();
+					goto PREPAREEXIT;
 					break;
 				case sf::Event::Resized: // TODO: Add screen resize handler
 					break;
@@ -371,8 +398,16 @@ int main(int argc, char** argv) {
 				vel = 0;
 		}
 
-		HandleKbdEvents(window, elapsedTime, inFocus);
+		if(HandleKbdEvents(window, elapsedTime, inFocus)) {
+			p_shapeMutex.lock();
+			shutdown = true;
+			p_shapeMutex.unlock();
+			WaitForRenderThread();
+			break;
+		}
 	}
+
+PREPAREEXIT:
 
 	// Wait for renderer to finish
 	DPRINT("Waiting for rendering thread");
