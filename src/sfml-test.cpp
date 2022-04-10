@@ -172,6 +172,7 @@ void Render(RenderThreadData *threadData) {
 	}
 
 	DPRINT("Thread exiting safetly");
+	return;
 }
 
 sf::Vector2i PrimaryMonitorCoordinates() {
@@ -270,6 +271,7 @@ int main(int argc, char** argv) {
 	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0],
 		   	sf::Style::Titlebar | sf::Style::Close, contextSettings); // Disable resize for now
 	
+	window.setVerticalSyncEnabled(true);
 	//window.setFramerateLimit(250);
 	SetDefaultWindowPosition(window);
 	window.setActive(false); // Disable OpenGl context before passing context to thread
