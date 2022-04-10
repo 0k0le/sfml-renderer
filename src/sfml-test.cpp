@@ -67,7 +67,7 @@
 #define JUMPVELOCITY 1000.0
 #define ACCELERATION 1200.0
 
-std::mutex p_shapeMutex;
+sf::Mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
 bool onTheGround = false;
 bool jumpEvent = false;
@@ -255,7 +255,9 @@ int main(int argc, char** argv) {
 	bool inFocus = true;
 
 	// Alert X that this will be a multithreaded application
-	XInitThreads();
+	if(XInitThreads() == 0) {
+		FATAL("Failed to init X Multithreaded");
+	}
 
 	// Load font for text
 	sf::Font font;
@@ -271,7 +273,7 @@ int main(int argc, char** argv) {
 	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0],
 		   	sf::Style::Titlebar | sf::Style::Close, contextSettings); // Disable resize for now
 	
-	window.setVerticalSyncEnabled(true);
+	//window.setVerticalSyncEnabled(true);
 	//window.setFramerateLimit(250);
 	SetDefaultWindowPosition(window);
 	window.setActive(false); // Disable OpenGl context before passing context to thread
@@ -328,7 +330,7 @@ int main(int argc, char** argv) {
 		auto elapsedTime = clock.restart().asSeconds();
 
 		// Handle Keyboard input
-		HandleKbdEvents(window, elapsedTime, inFocus);
+		//HandleKbdEvents(window, elapsedTime, inFocus);
 
 		p_shapeMutex.lock();
 		auto windowPositionOffset = GetWindowOffset(curWindowPosition, window);	
@@ -368,6 +370,8 @@ int main(int argc, char** argv) {
 			if(vel > -60)
 				vel = 0;
 		}
+
+		HandleKbdEvents(window, elapsedTime, inFocus);
 	}
 
 	// Wait for renderer to finish
