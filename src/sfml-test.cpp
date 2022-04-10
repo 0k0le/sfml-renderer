@@ -128,6 +128,7 @@ inline void WaitUntilActive(sf::RenderWindow &window) {
  * Handle all rendering related tasks
  */
 void Render(RenderThreadData *threadData) {
+	p_shapeMutex.lock();
 	sf::RenderWindow *window = threadData->window;
 	sf::Font *font = threadData->font;
 
@@ -152,22 +153,25 @@ void Render(RenderThreadData *threadData) {
 	sf::Clock clock;
 
 	// Get public handle on shape
-	p_shapeMutex.lock();
 	p_shape = &shape;
 	p_shapeMutex.unlock();
 
 	while(window->isOpen()) {
 		auto elapsedTime = clock.restart().asSeconds();
 		auto fps = 1.0f/elapsedTime; // Calculate FPS
-		text.setString("Renderer FPS: " + std::to_string(fps)); // Convert FPS to string
+		text.setString(std::string("Renderer FPS: ") + std::to_string(fps)); // Convert FPS to string
 
 		p_shapeMutex.lock();
-		window->clear();
-		window->draw(shape); // Draw circle
-		window->draw(text); // Draw text 
-		window->display(); // Push buffer to display
+		if(window->isOpen()) {
+			window->clear();
+			window->draw(shape); // Draw circle
+			window->draw(text); // Draw text 
+			window->display(); // Push buffer to display
+		}
 		p_shapeMutex.unlock();
 	}
+
+	DPRINT("Thread exiting safetly");
 }
 
 sf::Vector2i PrimaryMonitorCoordinates() {
@@ -223,6 +227,8 @@ void SetDefaultWindowPosition(sf::RenderWindow &window) {
 	// xcb get monitor coordinates
 	auto primaryPosition = PrimaryMonitorCoordinates();
 
+	//sf::Vector2i primaryPosition = {0, 0};
+
 	DPRINT("Desktop Width: %u\nDesktop Height: %u", desktop.width, desktop.height); 
 	DPRINT("Default Window Position: (%u, %u)", window.getPosition().x, window.getPosition().y);
 	DPRINT("Primary Monitor Position: (%u, %u)", primaryPosition.x, primaryPosition.y);
@@ -264,7 +270,7 @@ int main(int argc, char** argv) {
 	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0],
 		   	sf::Style::Titlebar | sf::Style::Close, contextSettings); // Disable resize for now
 	
-	window.setFramerateLimit(250);
+	//window.setFramerateLimit(250);
 	SetDefaultWindowPosition(window);
 	window.setActive(false); // Disable OpenGl context before passing context to thread
 
@@ -279,7 +285,9 @@ int main(int argc, char** argv) {
 	sf::Clock clock;
 
 	bool skipFirst = true;
+	p_shapeMutex.lock();
 	auto curWindowPosition = window.getPosition();
+	p_shapeMutex.unlock();
 	double vel = VELOCITY;
 
 	while(true) {
@@ -295,6 +303,7 @@ int main(int argc, char** argv) {
 	while (window.isOpen()) {
 		// Handle events
 		sf::Event event;
+		p_shapeMutex.lock();
 		while(window.pollEvent(event)) {
 			switch(event.type) {
 				case sf::Event::Closed:
@@ -312,13 +321,16 @@ int main(int argc, char** argv) {
 					break;
 			}
 		}
+		p_shapeMutex.unlock();
 
 		auto elapsedTime = clock.restart().asSeconds();
 
 		// Handle Keyboard input
 		HandleKbdEvents(window, elapsedTime, inFocus);
 
+		p_shapeMutex.lock();
 		auto windowPositionOffset = GetWindowOffset(curWindowPosition, window);	
+		p_shapeMutex.unlock();
 
 		if(windowPositionOffset.x != 0 || windowPositionOffset.y != 0) {
 			DPRINT("Window Offset: (%d, %d)", windowPositionOffset.x, windowPositionOffset.y);
@@ -357,6 +369,7 @@ int main(int argc, char** argv) {
 	}
 
 	// Wait for renderer to finish
+	DPRINT("Waiting for rendering thread");
 	thread.wait();
 
 	return EXIT_SUCCESS;
