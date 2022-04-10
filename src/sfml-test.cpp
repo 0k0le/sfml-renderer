@@ -20,8 +20,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define SFML_SYSTEM_LINUX
+
 // Standard Library
-#include <SFML/System/Vector2.hpp>
 #include <iostream>
 #include <ctime>
 #include <mutex>
@@ -31,6 +32,9 @@
 
 // SFML Includes
 #include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
+#include <SFML/OpenGL.hpp>
+#include <SFML/Main.hpp>
 
 // X Includes
 #include <X11/Xlib.h>
@@ -96,8 +100,10 @@ void HandleKbdEvents(sf::RenderWindow &window, float deltaTime, bool inFocus) {
 		return;	
 	
 	// Close window on escape keypress
-	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape)) {
 		window.close();
+		return;
+	}
 
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && onTheGround)
 		jumpEvent = true;
@@ -132,7 +138,10 @@ void Render(RenderThreadData *threadData) {
 	sf::Font *font = threadData->font;
 
 	// Reactivate OpenGl Context
-	WaitUntilActive(*window);
+	p_shapeMutex.lock();
+	//WaitUntilActive(*window);
+	window->setActive(true);
+	p_shapeMutex.unlock();
 
 	// Create window, circle, and text objects
 	sf::CircleShape shape(CIRCLESIZE);
@@ -356,8 +365,11 @@ int main(int argc, char** argv) {
 				vel = 0;
 		}
 
+		bool closed = false;
+
 		// Handle events
 		sf::Event event;
+		p_shapeMutex.lock();
 		while(window.pollEvent(event)) {
 			switch(event.type) {
 				case sf::Event::Closed:
@@ -374,7 +386,11 @@ int main(int argc, char** argv) {
 				default:
 					break;
 			}
+
+			if(closed)
+				break;
 		}
+		p_shapeMutex.unlock();
 
 		HandleKbdEvents(window, elapsedTime, inFocus);
 	}
@@ -382,6 +398,8 @@ int main(int argc, char** argv) {
 	// Wait for renderer to finish
 	DPRINT("Waiting for rendering thread");
 	thread.wait();
+
+	DPRINT("Shutdown Finished");
 
 	return EXIT_SUCCESS;
 }
