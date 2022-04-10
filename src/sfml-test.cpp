@@ -63,24 +63,29 @@
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 768
 #define MOVEMENTSPEED 400.0f
+#define VELOCITY 600.0
+#define JUMPVELOCITY 1000.0
+#define ACCELERATION 1200.0
 
 std::mutex p_shapeMutex;
 sf::CircleShape *p_shape = nullptr;
+bool onTheGround = false;
+bool jumpEvent = false;
 
 typedef struct RenderThreadData {
 	sf::RenderWindow *window;
 	sf::Font *font;
 } RenderThreadData;
 
-void MoveCharacter(sf::CircleShape &character, float xOffset, float yOffset, sf::RenderWindow &window) {
+void MoveCharacter(sf::CircleShape &character, double xOffset, double yOffset, sf::RenderWindow &window) {
 	auto radius = character.getRadius();
 	auto vec = character.getPosition();
 	vec.x += xOffset;
 	vec.y += yOffset;
 
 	// Make sure the ball can never leave the screen
-	vec.x = std::clamp<float>(vec.x, 0.0f, window.getSize().x-radius*2);
-	vec.y = std::clamp<float>(vec.y, 0.0f, window.getSize().y-radius*2);	
+	vec.x = std::clamp<double>(vec.x, 0.0f, window.getSize().x-radius*2);
+	vec.y = std::clamp<double>(vec.y, 0.0f, window.getSize().y-radius*2);	
 
 	character.setPosition(vec);
 }
@@ -93,18 +98,13 @@ void HandleKbdEvents(sf::RenderWindow &window, float deltaTime, bool inFocus) {
 	// Close window on escape keypress
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
 		window.close();
-	
+
+	if(sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && onTheGround)
+		jumpEvent = true;
+	else
+		jumpEvent = false;
+
 	// Handle ball control
-	if(sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-		p_shapeMutex.lock();
-		MoveCharacter(*p_shape, 0.0f, .0f-(MOVEMENTSPEED*deltaTime), window);
-		p_shapeMutex.unlock();
-	}
-	if(sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-		p_shapeMutex.lock();
-		MoveCharacter(*p_shape, 0.0f, (MOVEMENTSPEED*deltaTime), window);
-		p_shapeMutex.unlock();
-	}
 	if(sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 		p_shapeMutex.lock();
 		MoveCharacter(*p_shape, .0f-(MOVEMENTSPEED*deltaTime), 0.0f, window);
@@ -161,14 +161,12 @@ void Render(RenderThreadData *threadData) {
 		auto fps = 1.0f/elapsedTime; // Calculate FPS
 		text.setString("Renderer FPS: " + std::to_string(fps)); // Convert FPS to string
 
-		window->clear(); // Clear screen
-		
 		p_shapeMutex.lock();
+		window->clear();
 		window->draw(shape); // Draw circle
-		p_shapeMutex.unlock();
-
 		window->draw(text); // Draw text 
 		window->display(); // Push buffer to display
+		p_shapeMutex.unlock();
 	}
 }
 
@@ -235,6 +233,15 @@ void SetDefaultWindowPosition(sf::RenderWindow &window) {
 	window.setPosition(windowPosition);
 }
 
+sf::Vector2i GetWindowOffset(sf::Vector2i &lastPos, sf::RenderWindow &window) {
+	auto newPosition = window.getPosition();
+	sf::Vector2i offset = {newPosition.x - lastPos.x, newPosition.y - lastPos.y};
+
+	lastPos = newPosition;
+
+	return offset;
+}
+
 int main(int argc, char** argv) {
 	UNUSED_PARAMETER(argc);
 
@@ -271,6 +278,19 @@ int main(int argc, char** argv) {
 	// Set clock
 	sf::Clock clock;
 
+	bool skipFirst = true;
+	auto curWindowPosition = window.getPosition();
+	double vel = VELOCITY;
+
+	while(true) {
+		p_shapeMutex.lock();
+		if(p_shape != nullptr) {
+			p_shapeMutex.unlock();
+			break;
+		}
+		p_shapeMutex.unlock();
+	}
+
 	// main loop
 	while (window.isOpen()) {
 		// Handle events
@@ -287,7 +307,7 @@ int main(int argc, char** argv) {
 					break;
 				case sf::Event::LostFocus:
 					inFocus = false;
-					break;
+					break;				
 				default:
 					break;
 			}
@@ -296,8 +316,44 @@ int main(int argc, char** argv) {
 		auto elapsedTime = clock.restart().asSeconds();
 
 		// Handle Keyboard input
-		// TODO: Make this multi-threaded
-		HandleKbdEvents(window, elapsedTime, inFocus);	
+		HandleKbdEvents(window, elapsedTime, inFocus);
+
+		auto windowPositionOffset = GetWindowOffset(curWindowPosition, window);	
+
+		if(windowPositionOffset.x != 0 || windowPositionOffset.y != 0) {
+			DPRINT("Window Offset: (%d, %d)", windowPositionOffset.x, windowPositionOffset.y);
+			
+			if(skipFirst == true) {
+				skipFirst = false;
+				continue;
+			}
+
+			// TODO: Calculate gravity offsets caused by screen movement 
+		}
+
+		// Handle jump event
+		if(jumpEvent) {
+			jumpEvent = false;
+			vel = 0.0-JUMPVELOCITY;
+		}
+
+		p_shapeMutex.lock();
+		MoveCharacter(*p_shape, 0.0, vel*elapsedTime, window);
+		if(p_shape->getPosition().y == window.getSize().y-p_shape->getRadius()*2)
+			onTheGround = true;
+		else
+			onTheGround = false;
+		p_shapeMutex.unlock();
+
+		if(vel != 0.0)
+			vel += ACCELERATION*elapsedTime;
+
+		// Calculate bounce velocity
+		if(onTheGround == true && vel > 0.0) {
+			vel = 0.0-(vel/2);
+			if(vel > -60)
+				vel = 0;
+		}
 	}
 
 	// Wait for renderer to finish
