@@ -138,10 +138,7 @@ void Render(RenderThreadData *threadData) {
 	sf::Font *font = threadData->font;
 
 	// Reactivate OpenGl Context
-	p_shapeMutex.lock();
-	//WaitUntilActive(*window);
 	window->setActive(true);
-	p_shapeMutex.unlock();
 
 	// Create window, circle, and text objects
 	sf::CircleShape shape(CIRCLESIZE);
@@ -170,17 +167,14 @@ void Render(RenderThreadData *threadData) {
 		auto fps = 1.0f/elapsedTime; // Calculate FPS
 		text.setString(std::string("Renderer FPS: ") + std::to_string(fps)); // Convert FPS to string
 
-		p_shapeMutex.lock();
 		if(window->isOpen()) {
 			window->clear();
 			window->draw(shape); // Draw circle
 			window->draw(text); // Draw text 
 			window->display(); // Push buffer to display
 		} else {
-			p_shapeMutex.unlock();
 			break;
 		}
-		p_shapeMutex.unlock();
 	}
 
 	DPRINT("Thread exiting safetly");
@@ -285,7 +279,7 @@ int main(int argc, char** argv) {
 	sf::RenderWindow window(sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), argv[0],
 		   	sf::Style::Titlebar | sf::Style::Close, contextSettings); // Disable resize for now
 	
-	//window.setVerticalSyncEnabled(true);
+	window.setVerticalSyncEnabled(true);
 	//window.setFramerateLimit(250);
 	SetDefaultWindowPosition(window);
 	window.setActive(false); // Disable OpenGl context before passing context to thread
@@ -317,18 +311,13 @@ int main(int argc, char** argv) {
 
 	// main loop
 	while (true) {
-		p_shapeMutex.lock();
 		if(!window.isOpen()) {
-			p_shapeMutex.unlock();
 			break;
 		}
-		p_shapeMutex.unlock();
 
 		auto elapsedTime = clock.restart().asSeconds();
 
-		p_shapeMutex.lock();
 		auto windowPositionOffset = GetWindowOffset(curWindowPosition, window);	
-		p_shapeMutex.unlock();
 
 		if(windowPositionOffset.x != 0 || windowPositionOffset.y != 0) {
 			DPRINT("Window Offset: (%d, %d)", windowPositionOffset.x, windowPositionOffset.y);
@@ -369,7 +358,6 @@ int main(int argc, char** argv) {
 
 		// Handle events
 		sf::Event event;
-		p_shapeMutex.lock();
 		while(window.pollEvent(event)) {
 			switch(event.type) {
 				case sf::Event::Closed:
@@ -390,16 +378,15 @@ int main(int argc, char** argv) {
 			if(closed)
 				break;
 		}
-		p_shapeMutex.unlock();
 
 		HandleKbdEvents(window, elapsedTime, inFocus);
 	}
 
 	// Wait for renderer to finish
 	DPRINT("Waiting for rendering thread");
-	thread.wait();
+	thread.terminate();
 
 	DPRINT("Shutdown Finished");
 
-	return EXIT_SUCCESS;
+	_Exit(EXIT_SUCCESS);
 }
